@@ -1,65 +1,64 @@
-name: CI/CD for Dockerized Flask app ## workflow name
-## Events(Push,Pull,Merge,Delete) --> based on events we can trigger workflow
-# Trigger the workflow on any push to the main branch or pull request
-on: ##keyword
-  push: ## event1
-    branches: [ main ] # BRANCHES: WHERE WE WANT TO TRIGGER
-  pull_request: ##event2
+name: CI/CD for Dockerized Flask App
+
+on:
+  push:
     branches: [ main ]
-## Similiarly we can create more events like - Stratergy, production etc.
+  pull_request:
+    branches: [ main ]
+
 jobs:
-  build-and-test: ## unit testing
-    runs-on: ubuntu-latest ## git hub runs whole app in ubuntu-latest/windows/mac-os CONTAINER.
-
-    steps: ## workflow steps specification
-      # Step 1: Check out the code from the repository
-      - name: Check out code
-        uses: actions/checkout@v3 ## perbuilt github action to chk code from repository based on version here v2.
-
-      # Step 2: Set up Python environment
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      # Step 3: Install dependencies
-      - name: Install dependencies ## to run all the dependencies we require pytest library
-        run: |
-          python -m pip install --upgrade pip
-          pip install flask
-          pip install pytest
-
-      # Step 4: Run tests
-      - name: Run tests
-        run: |
-          pytest
-
-  build-and-publish:
-    needs: build-and-test ## run build-and-test first then build-and-publish or else both runs parallely
+  dockerbuild:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build The Docker Image
+      run: docker build . --file DockerFile --tag workflow-test:$(date +%s)
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-        - name: Set up Docker Buildx
-          uses: docker/setup-buildx-action@v2
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
 
-        - name: Login to DockerHub
-          uses: docker/login-action@v2
-          with:
-            username: ${{ secrets.DOCKER_USERNAME }}
-            password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flask
+        pip install pytest
 
-        - name: Build and push Docker image
-          uses: docker/build-push-action@v4
-          with:
-            context: .
-            file: ./DockerFile
-            push: true
-            tags: ${{ secrets.DOCKER USERNAME }}/flasktest-app:latest
+    - name: Run tests
+      run: |
+        pytest
 
-        - name: Image digest
-          run: echo ${{ steps.build-and-publish.outputs.digest }}
+  build-and-publish:
+    needs: build-and-test
+    runs-on: ubuntu-latest
 
-    ## NOW COPY THE ABOVE CODE FULLY AND PASTE IT IN GITHUB(Actions-->Python Application--> Configure --> paste--> commit changes)
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./DockerFile
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/flasktest-app:latest
+
+    - name: Image digest
+      run: echo ${{ steps.build-and-publish.outputs.digest }}
